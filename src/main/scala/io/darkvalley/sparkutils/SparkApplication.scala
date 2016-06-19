@@ -24,7 +24,7 @@ package io.darkvalley.sparkutils
 /**
   * SparkAdditions
   *
-  * @author Antonio Murgia
+  * @author Murgia Antonio
   * @version 19/06/16
   */
 trait SparkApplication[T,K] {
