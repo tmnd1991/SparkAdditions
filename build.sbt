@@ -17,3 +17,5 @@ libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 libraryDependencies += "org.apache.spark" %% "spark-core" % "1.6.1"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+
+libraryDependencies += "it.unimi.dsi" % "fastutil" % "7.0.13"
