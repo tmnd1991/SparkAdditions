@@ -71,7 +71,7 @@ class RDDFunctions[T](self: RDD[T])(implicit tt: ClassTag[T]) {
     }
   }
 
-  def groupByFast[K](mapSideCombine: Boolean, func: T => K): RDD[(K, Iterable[T])] = {
+  def groupByFast[K](mapSideCombine: Boolean, func: T => K)(implicit kt: ClassTag[K]): RDD[(K, Iterable[T])] = {
     groupByFast(mapSideCombine, Partitioner.defaultPartitioner(self), func)
   }
 }

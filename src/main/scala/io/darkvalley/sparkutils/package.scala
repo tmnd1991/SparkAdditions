@@ -24,6 +24,7 @@ package io.darkvalley
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
+import scala.language.implicitConversions
 
 /**
   * SparkAdditions
@@ -32,5 +33,5 @@ import scala.reflect.ClassTag
   * @version 30/11/16
   */
 package object sparkutils {
-  implicit def rdd2pimped[T: ClassTag](rdd: RDD[T]) = new RDDFunctions[T](rdd)
+  implicit def rdd2pimped[T: ClassTag](rdd: RDD[T]): RDDFunctions[T] = new RDDFunctions[T](rdd)
 }
