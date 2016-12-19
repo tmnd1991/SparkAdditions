@@ -21,9 +21,9 @@
 
 package io.darkvalley.sparkutils
 
+import io.darkvalley.sparkutils.groupby.{ArrayBuffer, FastUtil, LinkedList}
+import io.darkvalley.sparkutils.testing.LocalSparkContext
 import org.scalatest.{FlatSpec, Matchers}
-import io.darkvalley.sparkutils._
-import org.apache.spark.{SparkConf, SparkContext}
 
 /**
   * SparkAdditions
@@ -31,17 +31,41 @@ import org.apache.spark.{SparkConf, SparkContext}
   * @author tmnd
   * @version 30/11/16
   */
-class GroupByTest extends FlatSpec with Matchers {
+class GroupByTest extends FlatSpec with Matchers with LocalSparkContext {
 
-  it should "convert" in {
-//    val sc = new SparkContext(new SparkConf().setMaster("local"))
-//    val rdd = sc.parallelize(1 until 100)
-//    val r1 = rdd.groupBy(true, i => "" + i % 2)
-//    val r2 = rdd.groupBy(false, i => ""+ i % 2)
-//    val r3 = rdd.groupBy(_ * 2)
-//    r1 == r2
-//    r2 == r3
-//    r1 == r2
-    1 should be (1)
+  override def numThreads: Option[Int] = Some(5)
+
+  it should "compare original and LinkedList implementation" in {
+    val rdd = sc.parallelize(1 until 1000, numSlices = 5)
+    val keyFunc = (i: Int) => String.valueOf(i)
+    val groupBy = rdd.groupBy(keyFunc)
+    val customGroupBy = rdd.customGroupBy(mapSideCombine = false, t = LinkedList, keyFunc)
+    val customGroupBy2 = rdd.customGroupBy(mapSideCombine = true, t = LinkedList, keyFunc)
+
+    groupBy.collect().toMap should be(customGroupBy.collect().toMap)
+    groupBy.collect().toMap should be(customGroupBy2.collect().toMap)
   }
+
+  it should "compare original and ArrayBuffer implementation" in {
+    val rdd = sc.parallelize(1 until 1000, numSlices = 5)
+    val keyFunc = (i: Int) => String.valueOf(i)
+    val groupBy = rdd.groupBy(keyFunc)
+    val customGroupBy = rdd.customGroupBy(mapSideCombine = false, t = ArrayBuffer, keyFunc)
+    val customGroupBy2 = rdd.customGroupBy(mapSideCombine = true, t = ArrayBuffer, keyFunc)
+
+    groupBy.collect().toMap should be(customGroupBy.collect().toMap)
+    groupBy.collect().toMap should be(customGroupBy2.collect().toMap)
+  }
+
+  it should "compare original and FastUtil implementation" in {
+    val rdd = sc.parallelize(1 until 1000, numSlices = 5)
+    val keyFunc = (i: Int) => String.valueOf(i)
+    val groupBy = rdd.groupBy(keyFunc)
+    val customGroupBy = rdd.customGroupBy(mapSideCombine = false, t = FastUtil, keyFunc)
+    val customGroupBy2 = rdd.customGroupBy(mapSideCombine = true, t = FastUtil, keyFunc)
+
+    groupBy.collect().toMap should be(customGroupBy.collect().toMap)
+    groupBy.collect().toMap should be(customGroupBy2.collect().toMap)
+  }
+
 }

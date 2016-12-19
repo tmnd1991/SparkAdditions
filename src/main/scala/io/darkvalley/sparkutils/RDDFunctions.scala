@@ -21,9 +21,12 @@
 
 package io.darkvalley.sparkutils
 
+import java.util
+
+import io.darkvalley.sparkutils.groupby.Type
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
-import it.unimi.dsi.fastutil.objects.{ObjectArrayList}
+import it.unimi.dsi.fastutil.objects.ObjectArrayList
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -37,8 +40,23 @@ import scala.collection.JavaConverters._
   */
 class RDDFunctions[T](self: RDD[T])(implicit tt: ClassTag[T]) {
 
-  def groupBy[K](mapSideCombine: Boolean, partitioner: Partitioner, func: T => K)
-                (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
+  def customGroupBy[K](mapSideCombine: Boolean, partitioner: Partitioner, t: Type, func: T => K)
+                      (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = t match {
+    case groupby.FastUtil => groupByFast(mapSideCombine, partitioner, func)
+    case groupby.LinkedList => groupByLinked(mapSideCombine, partitioner, func)
+    case groupby.ArrayBuffer => groupBySpecial(mapSideCombine, partitioner, func)
+  }
+
+  def customGroupBy[K](mapSideCombine: Boolean, t: Type, func: T => K)(implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
+    customGroupBy(mapSideCombine, Partitioner.defaultPartitioner(self), t, func)
+  }
+
+  def customGroupBy[K](mapSideCombine: Boolean, func: T => K)(implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
+    customGroupBy(mapSideCombine, Partitioner.defaultPartitioner(self), groupby.FastUtil, func)
+  }
+
+  private def groupBySpecial[K](mapSideCombine: Boolean, partitioner: Partitioner, func: T => K)
+                               (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
     val createCombiner: (T) => ArrayBuffer[T] = (v: T) => ArrayBuffer(v)
     val mergeValue = (buf: ArrayBuffer[T], v: T) => buf += v
     val mergeCombiners = (c1: ArrayBuffer[T], c2: ArrayBuffer[T]) => c1 ++= c2
@@ -46,12 +64,8 @@ class RDDFunctions[T](self: RDD[T])(implicit tt: ClassTag[T]) {
       createCombiner, mergeValue, mergeCombiners, partitioner, mapSideCombine).asInstanceOf[RDD[(K, Iterable[T])]]
   }
 
-  def groupBy[K](mapSideCombine: Boolean, func: T => K)(implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
-    groupBy(mapSideCombine, Partitioner.defaultPartitioner(self), func)
-  }
-
-  def groupByFast[K](mapSideCombine: Boolean, partitioner: Partitioner, func: T => K)
-                    (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
+  private def groupByFast[K](mapSideCombine: Boolean, partitioner: Partitioner, func: T => K)
+                            (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
     val createCombiner = (v: T) => {
       val list = new ObjectArrayList[T]()
       list.add(v)
@@ -71,7 +85,24 @@ class RDDFunctions[T](self: RDD[T])(implicit tt: ClassTag[T]) {
     }
   }
 
-  def groupByFast[K](mapSideCombine: Boolean, func: T => K)(implicit kt: ClassTag[K]): RDD[(K, Iterable[T])] = {
-    groupByFast(mapSideCombine, Partitioner.defaultPartitioner(self), func)
+  private def groupByLinked[K](mapSideCombine: Boolean, partitioner: Partitioner, func: T => K)
+                              (implicit ct: ClassTag[K]): RDD[(K, Iterable[T])] = {
+    val createCombiner = (v: T) => {
+      val list = new util.LinkedList[T]()
+      list.add(v)
+      list
+    }
+    val mergeValue = (buf: util.LinkedList[T], v: T) => {
+      buf.add(v)
+      buf
+    }
+    val mergeCombiners = (c1: util.LinkedList[T], c2: util.LinkedList[T]) => {
+      c1.addAll(c2)
+      c1
+    }
+    self.keyBy(func).combineByKeyWithClassTag[util.LinkedList[T]](
+      createCombiner, mergeValue, mergeCombiners, partitioner, mapSideCombine).map {
+      case (key, values) => (key, values.asScala.toIterable)
+    }
   }
 }
